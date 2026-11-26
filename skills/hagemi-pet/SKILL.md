@@ -34,5 +34,5 @@ description: 打开、调试、更新或自定义「哈Gemi 桌面萌宠」Antig
    ```
 
 4. **双引擎状态同步说明**
-   - **实时会话日志监控**（`sidecar/transcript-watcher.mjs`）：增量追踪 `~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl`，区分主会话与派生子智能体，统计思考、工具、完工次数及 Token 消耗。
+   - **实时会话日志与授权状态监控**（`sidecar/transcript-watcher.mjs`）：增量追踪 `~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl` 并只读检测会话数据库等待授权状态（`status === 9`），区分主会话与派生子智能体，在需要用户授权或确认时切换为 `awaiting_auth` 琥珀色提醒状态，同时统计思考、工具、完工次数及 Token 消耗。
    - **生命周期 Hooks**（`hooks.json` + `hooks/emit.mjs`）：在 `SessionStart`、`PreInvocation`、`PostToolUse`、`PostInvocation`、`Stop` 触发时通过本地 UDP 端口 `39485` 零阻塞推送，不注册 `PreToolUse`，绝不干涉工具权限策略。

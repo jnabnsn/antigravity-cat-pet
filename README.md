@@ -17,12 +17,13 @@
   - **动作映射**：
     - 💭 收到提问 / 深度思考 → `工作状态-思考冒泡`
     - 💻 修改/编写代码与跑终端 → `写代码`
+    - 🔐 需要你点击授权/确认 → 琥珀色脉冲警示 + `🔐/❗` 提醒粒子 + 桌面轻跳置顶提醒（支持面板与桌面右键一键预览）
     - 🎉 回复完成 / 新会话开启 / 戳一戳 / 投喂 Token → `点击回应-开心跃动`
     - ⚡ 命令或工具报错 → `被吓一跳`
     - 🎀 鼠标拖拽悬空 → `被鼠标拖拽悬空反馈`
     - 😌 日常待机 → `待机呼吸休闲`
 - **Antigravity 双引擎实时联动**：
-  - **实时会话日志追踪**（`sidecar/transcript-watcher.mjs`）：300ms 增量读取 `~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl`，自动区分主会话与 Subagent 并实时累加 Token。
+  - **实时会话日志与状态监控**（`sidecar/transcript-watcher.mjs`）：300ms 增量读取 `~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl`，并结合只读 SQLite 步骤状态检测（`status === 9`），精准感知等待授权、思考与工具执行，自动区分主会话与 Subagent 并实时累加 Token。
   - **原生生命周期 Hooks**（`hooks.json` + `hooks/emit.mjs`）：通过本地 UDP 端口 `39485` 零阻塞推送 `SessionStart`、`PreInvocation`、`PostToolUse`、`PostInvocation`、`Stop` 事件（不注册 `PreToolUse`，不影响任何工具权限确认）。
 
 ---

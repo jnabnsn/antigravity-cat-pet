@@ -11,6 +11,7 @@ import os
 import platform
 import random
 import re
+import sqlite3
 import sys
 import threading
 import time
@@ -71,6 +72,7 @@ STATIC_AVATAR_FILES = {
     "happy": "avatar_relieved.png",
     "shocked": "avatar_shocked.png",
     "dangling": "avatar_shocked.png",
+    "awaiting_auth": "avatar_bust.png",
 }
 
 STATE_COLORS = {
@@ -81,7 +83,16 @@ STATE_COLORS = {
     "petted": "#F472B6",
     "error": "#F87171",
     "dragged": "#C084FC",
+    "awaiting_auth": "#F59E0B",
 }
+
+WAITING_STATUSES = frozenset({
+    "WAITING",
+    "WAITING_FOR_USER",
+    "PENDING_APPROVAL",
+    "NEEDS_APPROVAL",
+    "CORTEX_STEP_STATUS_WAITING",
+})
 
 TOOL_FRIENDLY_NAMES = {
     "read_file": "读文件",
@@ -160,23 +171,32 @@ def _is_pid_alive(pid: int) -> bool:
 
 
 class FloatingParticle:
-    """Floating particle emitted on click, feed, or celebration."""
+    """Floating particle emitted on click, feed, celebration, or auth prompt."""
 
-    def __init__(self, x: float, y: float) -> None:
+    def __init__(self, x: float, y: float, alert: bool = False) -> None:
         self.x = x + random.uniform(-22.0, 22.0)
         self.y = y + random.uniform(-10.0, 10.0)
         self.vx = random.uniform(-42.0, 42.0)
         self.vy = random.uniform(-110.0, -58.0)
         self.alpha = 1.0
         self.size = random.uniform(13.0, 20.0)
-        self.char = random.choice(["♥", "✨", "🌸", "⭐", "✦"])
-        self.color = random.choice([
-            QColor("#EC4899"),
-            QColor("#F472B6"),
-            QColor("#FBBF24"),
-            QColor("#818CF8"),
-            QColor("#38BDF8"),
-        ])
+        if alert:
+            self.char = random.choice(["🔐", "❗", "👆", "✨"])
+            self.color = random.choice([
+                QColor("#F59E0B"),
+                QColor("#FB923C"),
+                QColor("#FBBF24"),
+                QColor("#FDE047"),
+            ])
+        else:
+            self.char = random.choice(["♥", "✨", "🌸", "⭐", "✦"])
+            self.color = random.choice([
+                QColor("#EC4899"),
+                QColor("#F472B6"),
+                QColor("#FBBF24"),
+                QColor("#818CF8"),
+                QColor("#38BDF8"),
+            ])
 
     def update(self, dt: float) -> bool:
         self.x += self.vx * dt
@@ -282,8 +302,97 @@ class SpriteLibrary:
                     pass
 
 
+def _read_step_status_from_blob(blob: bytes) -> Optional[int]:
+    if not blob:
+        return None
+    pos = 0
+    length = len(blob)
+    while pos < length:
+        tag = 0
+        shift = 0
+        while pos < length:
+            b = blob[pos]
+            pos += 1
+            tag |= (b & 0x7F) << shift
+            if not (b & 0x80):
+                break
+            shift += 7
+            if shift > 35:
+                return None
+        field = tag >> 3
+        wire = tag & 7
+        if wire == 0:
+            val = 0
+            shift = 0
+            while pos < length:
+                b = blob[pos]
+                pos += 1
+                val |= (b & 0x7F) << shift
+                if not (b & 0x80):
+                    break
+                shift += 7
+                if shift > 35:
+                    return None
+            if field == 4:
+                return val
+        elif wire == 2:
+            slen = 0
+            shift = 0
+            while pos < length:
+                b = blob[pos]
+                pos += 1
+                slen |= (b & 0x7F) << shift
+                if not (b & 0x80):
+                    break
+                shift += 7
+                if shift > 35:
+                    return None
+            if slen < 0 or pos + slen > length:
+                break
+            pos += slen
+        elif wire == 1:
+            pos += 8
+        elif wire == 5:
+            pos += 4
+        else:
+            break
+    return None
+
+
+def _unwrap_arg(val):
+    if val is None:
+        return ""
+    if not isinstance(val, str):
+        return val
+    s = val.strip()
+    if (s.startswith('"') and s.endswith('"')) or (s.startswith("{") and s.endswith("}")):
+        try:
+            return json.loads(s)
+        except Exception:
+            return s
+    return s
+
+
+def _needs_feedback_approval(tc: dict) -> Optional[tuple[bool, str, str]]:
+    if not isinstance(tc, dict):
+        return None
+    name = str(tc.get("name") or "")
+    args = tc.get("args")
+    if not isinstance(args, dict):
+        return None
+    if name == "ask_question":
+        return True, name, "等待你选择确认"
+    bypass = _unwrap_arg(args.get("BypassSandbox"))
+    if bypass is True or str(bypass).lower() == "true":
+        return False, name or "run_command", "沙盒外命令授权"
+    art_meta = _unwrap_arg(args.get("ArtifactMetadata"))
+    if isinstance(art_meta, dict) and art_meta.get("RequestFeedback") is True:
+        return False, name or "write_file", "待你确认计划"
+    return None
+
+
 class SyncWorker(QObject):
-    """Syncs with Antigravity Sidecar SSE, with automatic transcript.jsonl fallback."""
+    """Syncs with Antigravity Sidecar SSE, with automatic transcript.jsonl + SQLite fallback."""
 
     state_received = Signal(dict)
     fallback_activity = Signal(dict)
@@ -309,12 +418,20 @@ class SyncWorker(QObject):
             Path.home() / ".gemini" / "antigravity-ide" / "brain",
             Path.home() / ".gemini" / "antigravity-cli" / "brain",
         ]
+        self._conv_roots = list({r.parent / "conversations" for r in self._brain_roots})
         self._offsets: Dict[Path, int] = {}
         self._buffers: Dict[Path, str] = {}
         self._primary_convs: set[Path] = set()
+        self._primary_conv_ids: set[str] = set()
         self._tracked_files: set[Path] = set()
+        self._db_stamps: Dict[Path, tuple[float, int, float, int]] = {}
+        self._db_schema: Dict[Path, tuple[Optional[str], Optional[str]]] = {}
+        self._last_tool_by_conv: Dict[str, tuple[str, str]] = {}
+        self._waiting_convs: Dict[str, str] = {}
+        self._pending_auth_deadline: Dict[str, tuple[float, str, str]] = {}
         self._seeded = False
         self._last_scan = 0.0
+        self._last_db_poll = 0.0
 
     def start(self) -> None:
         self._thread = threading.Thread(target=self._run, daemon=True)
@@ -447,15 +564,119 @@ class SyncWorker(QObject):
                 head = f.read(16384).decode("utf-8", errors="ignore")
             if '"USER_EXPLICIT"' in head:
                 self._primary_convs.add(path)
+                self._primary_conv_ids.add(path.parent.parent.parent.name)
                 return True
         except OSError:
             pass
         return False
 
+    def _emit_waiting_auth(self, conv_id: str, tool: str, detail: str, origin: str = "transcript") -> None:
+        self._pending_auth_deadline.pop(conv_id, None)
+        if conv_id in self._waiting_convs:
+            return
+        self._waiting_convs[conv_id] = origin
+        self.fallback_activity.emit({
+            "event": "WaitingAuth",
+            "origin": origin,
+            "tool": tool,
+            "detail": detail or "等待你的授权确认",
+            "tokens": 0,
+        })
+
+    def _resolve_waiting_auth(self, conv_id: str, origin: str = "transcript") -> None:
+        self._pending_auth_deadline.pop(conv_id, None)
+        if conv_id not in self._waiting_convs:
+            return
+        self._waiting_convs.pop(conv_id, None)
+        self.fallback_activity.emit({
+            "event": "AuthResolved",
+            "origin": origin,
+            "tokens": 0,
+        })
+
+    def _poll_databases(self, now: float) -> None:
+        for conv_root in self._conv_roots:
+            if not conv_root.is_dir():
+                continue
+            try:
+                db_files = list(conv_root.glob("*.db"))
+            except OSError:
+                continue
+            for db_path in db_files:
+                conv_id = db_path.stem
+                if self._primary_conv_ids and conv_id not in self._primary_conv_ids:
+                    continue
+                try:
+                    st = db_path.stat()
+                except OSError:
+                    continue
+                wal_path = Path(f"{db_path}-wal")
+                wal_mtime, wal_size = 0.0, 0
+                try:
+                    wst = wal_path.stat()
+                    wal_mtime, wal_size = wst.st_mtime, wst.st_size
+                except OSError:
+                    pass
+                newest = max(st.st_mtime, wal_mtime)
+                if now - newest > 90.0 and conv_id not in self._waiting_convs:
+                    continue
+                stamp = (st.st_mtime, st.st_size, wal_mtime, wal_size)
+                if self._db_stamps.get(db_path) == stamp:
+                    continue
+                self._db_stamps[db_path] = stamp
+                self._inspect_db_waiting(db_path, conv_id)
+
+    def _inspect_db_waiting(self, db_path: Path, conv_id: str) -> None:
+        conn = None
+        try:
+            uri = f"file:{db_path.as_posix()}?mode=ro"
+            conn = sqlite3.connect(uri, uri=True, timeout=0.3)
+            schema = self._db_schema.get(db_path)
+            if schema is None:
+                cols = [str(r[1]) for r in conn.execute("PRAGMA table_info(steps)").fetchall()]
+                status_col = next((c for c in cols if c in ("status", "step_status")), None)
+                blob_col = next((c for c in cols if c in ("data", "step", "payload")), None)
+                schema = (status_col, blob_col)
+                self._db_schema[db_path] = schema
+            status_col, blob_col = schema
+            if not status_col and not blob_col:
+                return
+            sel = ", ".join(c for c in ("idx", status_col, blob_col) if c)
+            rows = conn.execute(f"SELECT {sel} FROM steps ORDER BY idx DESC LIMIT 5").fetchall()
+            is_waiting = False
+            for row in rows:
+                offset = 1
+                if status_col:
+                    st_val = row[offset]
+                    offset += 1
+                    if st_val == 9 or str(st_val or "").upper() in WAITING_STATUSES:
+                        is_waiting = True
+                        break
+                if blob_col:
+                    blob_val = row[offset]
+                    if isinstance(blob_val, (bytes, bytearray, memoryview)):
+                        if _read_step_status_from_blob(bytes(blob_val)) == 9:
+                            is_waiting = True
+                            break
+            if is_waiting:
+                tool, detail = self._last_tool_by_conv.get(conv_id, ("", "等待你的授权确认"))
+                self._emit_waiting_auth(conv_id, tool, detail, origin="db")
+            elif self._waiting_convs.get(conv_id) == "db":
+                self._resolve_waiting_auth(conv_id, origin="db")
+        except Exception:
+            pass
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
     def _seed_transcripts(self) -> None:
         files = self._discover_transcripts()
-        self._tracked_files = files
-        for p in files:
+        this_files = files
+        self._tracked_files = this_files
+        for p in this_files:
             try:
                 self._offsets[p] = p.stat().st_size
                 self._buffers[p] = ""
@@ -490,6 +711,15 @@ class SyncWorker(QObject):
                     self._buffers[p] = ""
                 if size > prev:
                     self._read_new_lines(p, prev, size)
+
+            for cid, (deadline, tool, detail) in list(self._pending_auth_deadline.items()):
+                if now >= deadline:
+                    self._emit_waiting_auth(cid, tool, detail, origin="transcript")
+
+            if now - self._last_db_poll >= 0.6:
+                self._last_db_poll = now
+                self._poll_databases(now)
+
             self._stop.wait(0.35)
 
     def _read_new_lines(self, path: Path, start: int, end: int) -> None:
@@ -504,6 +734,7 @@ class SyncWorker(QObject):
         lines = text.split("\n")
         self._buffers[path] = lines[-1]
         is_primary = self._is_primary(path)
+        conv_id = path.parent.parent.parent.name
         for raw in lines[:-1]:
             s = raw.strip()
             if not s:
@@ -516,10 +747,11 @@ class SyncWorker(QObject):
                 continue
             if obj.get("source") == "USER_EXPLICIT":
                 self._primary_convs.add(path)
+                self._primary_conv_ids.add(conv_id)
                 is_primary = True
-            self._emit_step(obj, is_primary)
+            self._emit_step(obj, is_primary, conv_id)
 
-    def _emit_step(self, obj: dict, is_primary: bool) -> None:
+    def _emit_step(self, obj: dict, is_primary: bool, conv_id: str = "") -> None:
         step_type = str(obj.get("type") or "")
         source = str(obj.get("source") or "")
         status = str(obj.get("status") or "")
@@ -540,7 +772,15 @@ class SyncWorker(QObject):
                 })
             return
 
+        if status.upper() in WAITING_STATUSES:
+            tcs = obj.get("tool_calls") or []
+            last_tc = tcs[-1] if tcs and isinstance(tcs[-1], dict) else None
+            tool = str(last_tc.get("name") or "") if last_tc else self._last_tool_by_conv.get(conv_id, ("", ""))[0]
+            self._emit_waiting_auth(conv_id, tool, "等待你的授权确认", origin="transcript")
+            return
+
         if step_type == "USER_INPUT" and source == "USER_EXPLICIT":
+            self._resolve_waiting_auth(conv_id, origin="transcript")
             m = _USER_REQ_RE.search(str(obj.get("content") or ""))
             raw = m.group(1) if m else str(obj.get("content") or "")
             prompt = " ".join(raw.strip().split())[:24]
@@ -549,20 +789,37 @@ class SyncWorker(QObject):
             tcs = obj.get("tool_calls") or []
             content = str(obj.get("content") or "").strip()
             if status == "ERROR":
+                self._pending_auth_deadline.pop(conv_id, None)
                 self.fallback_activity.emit({"event": "Error", "tokens": tokens})
             elif tcs:
                 tc = tcs[-1] if isinstance(tcs[-1], dict) else {}
+                tool_name = str(tc.get("name") or "tool")
+                self._last_tool_by_conv[conv_id] = (tool_name, "")
                 self.fallback_activity.emit({
                     "event": "ToolStart",
                     "origin": "transcript",
-                    "tool": str(tc.get("name") or "tool"),
+                    "tool": tool_name,
                     "tokens": tokens,
                 })
+                for call in tcs:
+                    sig = _needs_feedback_approval(call)
+                    if sig:
+                        immediate, sig_tool, sig_detail = sig
+                        if immediate:
+                            self._emit_waiting_auth(conv_id, sig_tool, sig_detail, origin="transcript")
+                        else:
+                            self._pending_auth_deadline[conv_id] = (time.time() + 0.65, sig_tool, sig_detail)
+                        break
             elif content and status == "DONE":
+                self._resolve_waiting_auth(conv_id, origin="transcript")
                 self.fallback_activity.emit({"event": "TurnComplete", "tokens": tokens})
             else:
                 self.fallback_activity.emit({"event": "Thinking", "tokens": tokens})
         elif step_type == "GENERIC":
+            if self._waiting_convs.get(conv_id) == "transcript":
+                self._resolve_waiting_auth(conv_id, origin="transcript")
+            else:
+                self._pending_auth_deadline.pop(conv_id, None)
             content = str(obj.get("content") or "")
             m = _EXIT_CODE_RE.search(content)
             has_err = (status == "ERROR") or (m is not None and m.group(1) != "0")
@@ -613,6 +870,7 @@ class HagemiDesktopPet(QWidget):
         self.vel_sx = 0.0
         self.vel_sy = 0.0
         self.tilt_deg = 0.0
+        self._next_auth_nudge = 0.0
         self.particles: List[FloatingParticle] = []
 
         # Drag + Throw physics
@@ -729,11 +987,11 @@ class HagemiDesktopPet(QWidget):
         self.vel_sx += strength * 14.0
         self.vel_sy -= strength * 14.0
 
-    def _spawn_particles(self, count: int = 7) -> None:
+    def _spawn_particles(self, count: int = 7, alert: bool = False) -> None:
         cx = self.width() * 0.5
         cy = self.height() * 0.42
         for _ in range(count):
-            self.particles.append(FloatingParticle(cx, cy))
+            self.particles.append(FloatingParticle(cx, cy, alert=alert))
 
     def _set_action_local(
         self,
@@ -800,7 +1058,12 @@ class HagemiDesktopPet(QWidget):
             self.frame_accum = 0.0
             exp_ms = int(snap.get("stateExpiresAt") or 0)
             self.state_until = (exp_ms / 1000.0) if exp_ms > 0 else 0.0
-            if action == "happy":
+            if self.state == "awaiting_auth":
+                self.raise_()
+                self._spawn_particles(6, alert=True)
+                self._trigger_squish(0.16)
+                self._next_auth_nudge = time.perf_counter() + 2.6
+            elif action == "happy":
                 self._spawn_particles(7)
                 self._trigger_squish(0.18)
             elif action == "shocked":
@@ -825,7 +1088,26 @@ class HagemiDesktopPet(QWidget):
             self.total_tokens += tokens
 
         ev = str(payload.get("event") or "")
-        if ev == "Thinking":
+        if ev == "WaitingAuth":
+            tool = str(payload.get("tool") or "")
+            detail = str(payload.get("detail") or "")
+            cn = TOOL_FRIENDLY_NAMES.get(tool, tool or "")
+            if tool == "ask_question":
+                bubble = "主人！哈Gemi 有问题需要你确认喵~ 🔐"
+            elif cn:
+                bubble = f"主人！需要你授权 {cn} 才能继续喵~ 🔐"
+            else:
+                bubble = "主人！Antigravity 正在等你点击授权喵~ 🔐"
+            badge = f"请授权 · {cn}" if cn else "Antigravity · 等待授权"
+            self._set_action_local("happy", badge, bubble, loop=True, duration=600.0)
+            self.state = "awaiting_auth"
+            self.raise_()
+            self._spawn_particles(6, alert=True)
+            self._next_auth_nudge = time.perf_counter() + 2.6
+        elif ev == "AuthResolved":
+            if self.state == "awaiting_auth":
+                self._set_action_local("thinking", "Antigravity · 继续执行", "收到授权！哈Gemi 继续干活喵~", loop=True, duration=60.0)
+        elif ev == "Thinking":
             prompt = str(payload.get("prompt") or "")
             bubble = f"收到指令！思考冒泡中…\n「{prompt}」" if prompt else "哈Gemi 深度思考冒泡中喵…"
             self._set_action_local("thinking", "Antigravity · 深度思考中", bubble, loop=True, duration=120.0)
@@ -935,6 +1217,11 @@ class HagemiDesktopPet(QWidget):
                     self._trigger_squish(0.18)
                 self.move(int(round(self._phys_x)), int(round(self._phys_y)))
 
+        if self.state == "awaiting_auth" and not self._dragging and now >= self._next_auth_nudge:
+            self._next_auth_nudge = now + 2.8
+            self._trigger_squish(0.11)
+            self._spawn_particles(3, alert=True)
+
         if self.particles:
             self.particles = [p for p in self.particles if p.update(dt)]
 
@@ -989,7 +1276,8 @@ class HagemiDesktopPet(QWidget):
                     drawn = True
 
         if not drawn:
-            av = self.lib.get_avatar(self.action_key)
+            av_key = "awaiting_auth" if (self.state == "awaiting_auth" and not self._dragging) else self.action_key
+            av = self.lib.get_avatar(av_key)
             if av and not av.isNull():
                 target_h = 205.0 * self.pet_scale
                 target_w = target_h * (av.width() / max(1.0, float(av.height())))
@@ -1033,7 +1321,9 @@ class HagemiDesktopPet(QWidget):
 
         dot_color = QColor(STATE_COLORS.get(self.state, "#818CF8"))
         rect = QRectF(cx - pw * 0.5, cy - ph * 0.5, pw, ph)
-        painter.setPen(QPen(QColor(dot_color.red(), dot_color.green(), dot_color.blue(), 195), 1.3))
+        is_auth = self.state == "awaiting_auth"
+        border_w = 1.9 if is_auth else 1.3
+        painter.setPen(QPen(QColor(dot_color.red(), dot_color.green(), dot_color.blue(), 225 if is_auth else 195), border_w))
         painter.setBrush(QColor(15, 23, 42, 224))
         painter.drawRoundedRect(rect, ph * 0.5, ph * 0.5)
 
@@ -1070,10 +1360,12 @@ class HagemiDesktopPet(QWidget):
 
         rect = QRectF(x, y, bw, bh)
         bg = QColor(15, 23, 42, int(236 * alpha))
-        border = QColor(129, 140, 248, int(215 * alpha))
+        is_auth = self.state == "awaiting_auth"
+        border = QColor(245, 158, 11, int(245 * alpha)) if is_auth else QColor(129, 140, 248, int(215 * alpha))
+        border_w = 2.0 if is_auth else 1.5
         fg = QColor(248, 250, 252, int(255 * alpha))
 
-        painter.setPen(QPen(border, 1.5))
+        painter.setPen(QPen(border, border_w))
         painter.setBrush(bg)
         painter.drawRoundedRect(rect, 12, 12)
 
@@ -1085,7 +1377,7 @@ class HagemiDesktopPet(QWidget):
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(bg)
         painter.drawPath(tri)
-        painter.setPen(QPen(border, 1.5))
+        painter.setPen(QPen(border, border_w))
         painter.drawLine(QPointF(cx - 6, y + bh), QPointF(cx, y + bh + 6))
         painter.drawLine(QPointF(cx, y + bh + 6), QPointF(cx + 6, y + bh))
 
@@ -1201,6 +1493,7 @@ class HagemiDesktopPet(QWidget):
             ("happy", "✨ 开心跃动"),
             ("shocked", "⚡ 被吓一跳"),
             ("dangling", "🎀 悬空挣扎"),
+            ("awaiting_auth", "🔐 等待授权"),
         ]:
             sub_act.addAction(label).triggered.connect(
                 lambda _c=False, k=key: self._preview_action(k)
@@ -1245,6 +1538,17 @@ class HagemiDesktopPet(QWidget):
     def _preview_action(self, key: str) -> None:
         if self.sidecar_connected:
             self.sync.post_action({"type": "preview", "action": key})
+        elif key == "awaiting_auth":
+            self._set_action_local(
+                "happy",
+                "Antigravity · 等待授权",
+                "主人！需要你点一下授权才能继续喵~ 🔐\n(示例：沙盒外命令执行确认)",
+                loop=True,
+                duration=12.0,
+            )
+            self.state = "awaiting_auth"
+            self._spawn_particles(6, alert=True)
+            self._next_auth_nudge = time.perf_counter() + 2.6
         else:
             self._set_action_local(key, bubble=f"预览动作：{ACTION_DEFS[key]['title']}~", duration=8.0)
 

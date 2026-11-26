@@ -240,7 +240,8 @@ const petState = {
     tool: 0,
     done: 0,
     tokens: 0,
-    pets: 0
+    pets: 0,
+    auth: 0
   },
   watcher: {
     trackedCount: 0,
@@ -532,6 +533,45 @@ function handleLiveActivity(payload) {
     petState.stats.tokens += tokens;
   }
 
+  if (event === 'WaitingAuth') {
+    petState.stats.auth = (petState.stats.auth || 0) + 1;
+    const cnTool = TOOL_FRIENDLY_NAMES[tool] || tool || '';
+    let bubble = '主人！Antigravity 正在等你点击授权喵~ 🔐';
+    if (tool === 'ask_question') {
+      bubble = '主人！哈Gemi 有问题需要你确认喵~ 🔐';
+    } else if (cnTool) {
+      bubble = `主人！需要你授权 ${cnTool} 才能继续喵~ 🔐${detail ? `\n${detail}` : ''}`;
+    }
+    const badge = cnTool ? `请授权 · ${cnTool}` : 'Antigravity · 等待授权';
+    pushLog('授权', `等待确认: ${cnTool || '操作'}${detail ? ` (${detail})` : ''}`);
+    setPetAction({
+      state: 'awaiting_auth',
+      action: 'happy',
+      loop: true,
+      durationMs: 600_000,
+      bubble,
+      bubbleDurationMs: 600_000,
+      badge
+    });
+    return;
+  }
+
+  if (event === 'AuthResolved') {
+    if (petState.state === 'awaiting_auth') {
+      pushLog('授权', '主人已响应授权，继续执行~');
+      setPetAction({
+        state: 'thinking',
+        action: 'thinking',
+        loop: true,
+        durationMs: 60_000,
+        bubble: '收到授权！哈Gemi 继续干活喵~',
+        bubbleDurationMs: 3500,
+        badge: 'Antigravity · 继续执行'
+      });
+    }
+    return;
+  }
+
   if (event === 'Thinking') {
     petState.stats.think += 1;
     const shortPrompt = prompt
@@ -644,6 +684,17 @@ function handleHookEvent(payload) {
   } else if (event === 'PostToolUse') {
     const cnTool = TOOL_FRIENDLY_NAMES[tool] || tool || '工具';
     pushLog('Hook', `PostToolUse: ${cnTool}${detail ? ` (${detail})` : ''}`);
+    if (petState.state === 'awaiting_auth') {
+      setPetAction({
+        state: 'thinking',
+        action: 'thinking',
+        loop: true,
+        durationMs: 60_000,
+        bubble: '收到授权，继续执行喵~',
+        bubbleDurationMs: 3500,
+        badge: 'Antigravity · 继续执行'
+      });
+    }
   } else if (event === 'Stop' && reason === 'USER_CANCELED') {
     pushLog('Hook', 'Stop (USER_CANCELED)');
     setPetAction({
@@ -899,25 +950,38 @@ const server = http.createServer(async (req, res) => {
 
       if (kind === 'preview') {
         const actionKey = String(body.action || 'idle');
-        const def = ACTION_DEFINITIONS.find((d) => d.key === actionKey) || ACTION_DEFINITIONS[0];
-        const bubbleMap = {
-          idle: '回到待机呼吸状态喵~ 随时等你吩咐！',
-          thinking: '思考冒泡中…让哈Gemi 想想怎么优化这段代码！',
-          coding: '哒哒哒——哈Gemi 全速敲键盘写代码中！',
-          happy: '耶！开心跃动时间喵✨',
-          shocked: '呜哇！！吓本小姐一跳！',
-          dangling: '呜哇哇！快把哈Gemi 放下来啦！'
-        };
-        pushLog('预览', `切换动作 -> ${def.title}`);
-        setPetAction({
-          state: def.category,
-          action: def.key,
-          loop: def.loop,
-          durationMs: def.key === 'idle' ? 0 : 9500,
-          bubble: String(body.bubble || bubbleMap[def.key] || ''),
-          bubbleDurationMs: 5000,
-          badge: def.badge
-        });
+        if (actionKey === 'awaiting_auth') {
+          pushLog('预览', '切换状态 -> 等待授权');
+          setPetAction({
+            state: 'awaiting_auth',
+            action: 'happy',
+            loop: true,
+            durationMs: 12_000,
+            bubble: String(body.bubble || '主人！需要你点一下授权才能继续喵~ 🔐\n(示例：沙盒外命令执行确认)'),
+            bubbleDurationMs: 12_000,
+            badge: 'Antigravity · 等待授权'
+          });
+        } else {
+          const def = ACTION_DEFINITIONS.find((d) => d.key === actionKey) || ACTION_DEFINITIONS[0];
+          const bubbleMap = {
+            idle: '回到待机呼吸状态喵~ 随时等你吩咐！',
+            thinking: '思考冒泡中…让哈Gemi 想想怎么优化这段代码！',
+            coding: '哒哒哒——哈Gemi 全速敲键盘写代码中！',
+            happy: '耶！开心跃动时间喵✨',
+            shocked: '呜哇！！吓本小姐一跳！',
+            dangling: '呜哇哇！快把哈Gemi 放下来啦！'
+          };
+          pushLog('预览', `切换动作 -> ${def.title}`);
+          setPetAction({
+            state: def.category,
+            action: def.key,
+            loop: def.loop,
+            durationMs: def.key === 'idle' ? 0 : 9500,
+            bubble: String(body.bubble || bubbleMap[def.key] || ''),
+            bubbleDurationMs: 5000,
+            badge: def.badge
+          });
+        }
       } else if (kind === 'poke') {
         petState.stats.pets += 1;
         const line = POKE_LINES[Math.floor(Math.random() * POKE_LINES.length)];
@@ -945,7 +1009,7 @@ const server = http.createServer(async (req, res) => {
           badge: '投喂中 · 炫 Token'
         });
       } else if (kind === 'reset_stats') {
-        petState.stats = { think: 0, tool: 0, done: 0, tokens: 0, pets: 0 };
+        petState.stats = { think: 0, tool: 0, done: 0, tokens: 0, pets: 0, auth: 0 };
         pushLog('系统', '已清空会话统计计数器');
         returnToIdle();
       } else if (kind === 'preferences') {

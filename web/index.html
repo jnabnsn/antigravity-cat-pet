@@ -256,6 +256,30 @@
       transform: translateX(-50%) rotate(45deg);
     }
 
+    .stage-card.awaiting-auth {
+      border-color: rgba(245, 158, 11, 0.85);
+      box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.24), var(--shadow);
+      animation: authGlow 1.6s ease-in-out infinite;
+    }
+
+    .bubble.awaiting-auth {
+      border-color: rgba(245, 158, 11, 0.88);
+    }
+
+    .bubble.awaiting-auth::after {
+      border-right-color: rgba(245, 158, 11, 0.88);
+      border-bottom-color: rgba(245, 158, 11, 0.88);
+    }
+
+    .status-pill.awaiting-auth {
+      border-color: rgba(245, 158, 11, 0.9);
+    }
+
+    @keyframes authGlow {
+      0%, 100% { box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.22), var(--shadow); }
+      50% { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.42), var(--shadow); }
+    }
+
     .canvas-wrap {
       position: relative;
       width: 100%;
@@ -433,6 +457,23 @@
     .action-btn.active {
       border-color: var(--accent);
       background: var(--accent);
+      color: #ffffff;
+    }
+
+    .action-btn[data-action-key="awaiting_auth"] {
+      grid-column: 1 / -1;
+      border-color: rgba(245, 158, 11, 0.45);
+      background: rgba(245, 158, 11, 0.1);
+    }
+
+    .action-btn[data-action-key="awaiting_auth"]:hover {
+      border-color: #f59e0b;
+      background: rgba(245, 158, 11, 0.2);
+    }
+
+    .action-btn[data-action-key="awaiting_auth"].active {
+      border-color: #f59e0b;
+      background: #d97706;
       color: #ffffff;
     }
 
@@ -648,7 +689,8 @@
         { key: 'coding', label: '💻 疯狂写码' },
         { key: 'happy', label: '✨ 开心跃动' },
         { key: 'shocked', label: '⚡ 被吓一跳' },
-        { key: 'dangling', label: '🎀 悬空挣扎' }
+        { key: 'dangling', label: '🎀 悬空挣扎' },
+        { key: 'awaiting_auth', label: '🔐 等待授权' }
       ];
 
       const STATE_COLORS = {
@@ -658,7 +700,8 @@
         celebrate: '#fbbf24',
         petted: '#f472b6',
         error: '#f87171',
-        dragged: '#c084fc'
+        dragged: '#c084fc',
+        awaiting_auth: '#f59e0b'
       };
 
       const IDLE_QUOTES = [
@@ -671,7 +714,9 @@
 
       const canvas = document.getElementById('petCanvas');
       const ctx = canvas.getContext('2d');
+      const stageCardEl = document.querySelector('.stage-card');
       const bubbleEl = document.getElementById('speechBubble');
+      const statusPillEl = document.querySelector('.status-pill');
       const statusDotEl = document.getElementById('statusDot');
       const statusBadgeEl = document.getElementById('statusBadge');
       const connDotEl = document.getElementById('connDot');
@@ -729,6 +774,7 @@
         velSx: 0,
         velSy: 0,
         t: 0,
+        nextAuthNudgeAt: 0,
         particles: []
       };
 
@@ -743,11 +789,13 @@
         sim.velSy -= strength * 14;
       }
 
-      function spawnParticles(count = 7) {
+      function spawnParticles(count = 7, alert = false) {
         const w = canvas.clientWidth || 300;
         const h = canvas.clientHeight || 224;
-        const chars = ['♥', '✨', '🌸', '⭐', '✦'];
-        const colors = ['#ec4899', '#f472b6', '#fbbf24', '#818cf8', '#38bdf8'];
+        const chars = alert ? ['🔐', '❗', '👆', '✨'] : ['♥', '✨', '🌸', '⭐', '✦'];
+        const colors = alert
+          ? ['#f59e0b', '#fb923c', '#fbbf24', '#fde047']
+          : ['#ec4899', '#f472b6', '#fbbf24', '#818cf8', '#38bdf8'];
         for (let i = 0; i < count; i++) {
           sim.particles.push({
             x: w * 0.5 + (Math.random() - 0.5) * 64,
@@ -778,25 +826,32 @@
       }
 
       function syncActionButtonsActive() {
+        const highlightKey = sim.serverState === 'awaiting_auth' ? 'awaiting_auth' : sim.activeAction;
         for (const btn of actionsGridEl.querySelectorAll('.action-btn')) {
-          btn.classList.toggle('active', btn.dataset.actionKey === sim.activeAction);
+          btn.classList.toggle('active', btn.dataset.actionKey === highlightKey);
         }
       }
 
       function applyServerState(snap) {
         if (!snap) return;
 
+        const nextServerState = snap.state || 'idle';
+        sim.serverState = nextServerState;
+
         if (snap.seq !== sim.serverSeq && !sim.isDragging) {
           const prevAction = sim.activeAction;
           sim.serverSeq = snap.seq;
-          sim.serverState = snap.state || 'idle';
           sim.activeAction = snap.action || 'idle';
           sim.loop = snap.loop !== false;
           if (prevAction !== sim.activeAction || !sim.loop) {
             sim.frameIdx = 0;
             sim.frameAccum = 0;
           }
-          if (sim.activeAction === 'happy') {
+          if (nextServerState === 'awaiting_auth') {
+            triggerSquish(0.16);
+            spawnParticles(6, true);
+            sim.nextAuthNudgeAt = performance.now() + 2600;
+          } else if (sim.activeAction === 'happy') {
             triggerSquish(0.18);
             spawnParticles(7);
           } else if (sim.activeAction === 'shocked') {
@@ -808,9 +863,14 @@
           if (avMeta) loadImageCached(avMeta.url);
         }
 
+        const isAuth = nextServerState === 'awaiting_auth';
+        stageCardEl.classList.toggle('awaiting-auth', isAuth);
+        bubbleEl.classList.toggle('awaiting-auth', isAuth);
+        statusPillEl.classList.toggle('awaiting-auth', isAuth);
+
         sim.badge = snap.badge || 'Antigravity · 待命中';
         statusBadgeEl.textContent = sim.badge;
-        statusDotEl.style.background = STATE_COLORS[snap.state] || '#818cf8';
+        statusDotEl.style.background = STATE_COLORS[nextServerState] || '#818cf8';
 
         sim.serverBubbleText = snap.bubble || '';
         sim.serverBubbleUntil = snap.bubbleUntil || 0;
@@ -990,6 +1050,13 @@
         }
         sim.tiltDeg += (targetTilt - sim.tiltDeg) * Math.min(1, dt * 12);
 
+        // Periodic attention nudge while awaiting user authorization
+        if (sim.serverState === 'awaiting_auth' && !sim.isDragging && now >= sim.nextAuthNudgeAt) {
+          sim.nextAuthNudgeAt = now + 2800;
+          triggerSquish(0.11);
+          spawnParticles(3, true);
+        }
+
         // Update particles
         for (let i = sim.particles.length - 1; i >= 0; i--) {
           const p = sim.particles[i];
@@ -1037,7 +1104,8 @@
         }
 
         if (!drawn) {
-          const av = catalog.avatars[actionKey] || catalog.avatars.idle;
+          const staticKey = sim.serverState === 'awaiting_auth' && !sim.isDragging ? 'thinking' : actionKey;
+          const av = catalog.avatars[staticKey] || catalog.avatars.idle;
           if (av) {
             const entry = loadImageCached(av.url);
             if (entry && entry.loaded && !entry.failed) {

@@ -218,6 +218,16 @@ async function verifyRuntime() {
     assert.equal(postJson.ok, true);
     assert.equal(postJson.state.action, 'coding');
 
+    const authPreviewRes = await fetch(`${baseUrl}/api/action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'preview', action: 'awaiting_auth' })
+    });
+    assert.equal(authPreviewRes.status, 200);
+    const authPreviewJson = await authPreviewRes.json();
+    assert.equal(authPreviewJson.ok, true);
+    assert.equal(authPreviewJson.state.state, 'awaiting_auth');
+
     console.log('[PASS] Runtime HTTP, WebP assets, Hook UDP round-trip, and /api/action checks passed.');
   } finally {
     srv.kill('SIGTERM');
