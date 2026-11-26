@@ -1,26 +1,6 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.egg-info/
-.eggs/
-build/
-dist/
-wheels/
-
-# Virtual environments
-.venv/
-venv/
-env/
-
-# Runtime assets downloaded via `agy-pet fetch-assets` (kept out of git to keep repo lightweight)
-assets/
-vendor/
-
-# IDE & OS
-.vscode/
-.idea/
+node_modules/
 .DS_Store
 Thumbs.db
 *.log
-*.docx
+.antigravity-hagemi-pet/
+tmp/

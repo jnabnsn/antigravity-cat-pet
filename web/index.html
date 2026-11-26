@@ -1,0 +1,1232 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>哈Gemi 桌面萌宠</title>
+  <script src="./preload.js"></script>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --card-muted: #f1f5f9;
+      --border: rgba(15, 23, 42, 0.1);
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --accent: #6366f1;
+      --accent-soft: rgba(99, 102, 241, 0.12);
+      --pink: #ec4899;
+      --stage-bg: radial-gradient(circle at 50% 42%, rgba(99, 102, 241, 0.14), rgba(236, 72, 153, 0.06) 58%, transparent 80%);
+      --bubble-bg: rgba(255, 255, 255, 0.96);
+      --bubble-border: rgba(99, 102, 241, 0.45);
+      --bubble-text: #1e293b;
+      --pill-bg: rgba(15, 23, 42, 0.86);
+      --pill-text: #f8fafc;
+      --shadow: 0 6px 20px rgba(15, 23, 42, 0.07);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0b1120;
+        --card: #111827;
+        --card-muted: #1e293b;
+        --border: rgba(148, 163, 184, 0.16);
+        --text: #f1f5f9;
+        --text-muted: #94a3b8;
+        --accent: #818cf8;
+        --accent-soft: rgba(129, 140, 248, 0.16);
+        --pink: #f472b6;
+        --stage-bg: radial-gradient(circle at 50% 42%, rgba(129, 140, 248, 0.18), rgba(244, 114, 182, 0.08) 58%, transparent 82%);
+        --bubble-bg: rgba(15, 23, 42, 0.94);
+        --bubble-border: rgba(129, 140, 248, 0.52);
+        --bubble-text: #f1f5f9;
+        --pill-bg: rgba(15, 23, 42, 0.92);
+        --pill-text: #f8fafc;
+        --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      }
+    }
+
+    html[data-theme="light"] {
+      color-scheme: light;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --card-muted: #f1f5f9;
+      --border: rgba(15, 23, 42, 0.1);
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --accent: #6366f1;
+      --accent-soft: rgba(99, 102, 241, 0.12);
+      --pink: #ec4899;
+      --stage-bg: radial-gradient(circle at 50% 42%, rgba(99, 102, 241, 0.14), rgba(236, 72, 153, 0.06) 58%, transparent 80%);
+      --bubble-bg: rgba(255, 255, 255, 0.96);
+      --bubble-border: rgba(99, 102, 241, 0.45);
+      --bubble-text: #1e293b;
+      --pill-bg: rgba(15, 23, 42, 0.86);
+      --pill-text: #f8fafc;
+      --shadow: 0 6px 20px rgba(15, 23, 42, 0.07);
+    }
+
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #0b1120;
+      --card: #111827;
+      --card-muted: #1e293b;
+      --border: rgba(148, 163, 184, 0.16);
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent: #818cf8;
+      --accent-soft: rgba(129, 140, 248, 0.16);
+      --pink: #f472b6;
+      --stage-bg: radial-gradient(circle at 50% 42%, rgba(129, 140, 248, 0.18), rgba(244, 114, 182, 0.08) 58%, transparent 82%);
+      --bubble-bg: rgba(15, 23, 42, 0.94);
+      --bubble-border: rgba(129, 140, 248, 0.52);
+      --bubble-text: #f1f5f9;
+      --pill-bg: rgba(15, 23, 42, 0.92);
+      --pill-text: #f8fafc;
+      --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 10px;
+      background: var(--bg);
+      color: var(--text);
+      font: 12px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+
+    .app {
+      max-width: 560px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 10px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .brand img {
+      width: 26px;
+      height: 26px;
+      border-radius: 7px;
+      object-fit: contain;
+      background: var(--card-muted);
+      flex-shrink: 0;
+    }
+
+    .brand-meta {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .brand-title {
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .conn-line {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .conn-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #f59e0b;
+      flex-shrink: 0;
+    }
+
+    .conn-dot.online {
+      background: #10b981;
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+    }
+
+    .mode-switch {
+      display: inline-flex;
+      background: var(--card-muted);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 2px;
+      flex-shrink: 0;
+    }
+
+    .mode-btn {
+      appearance: none;
+      border: 0;
+      background: transparent;
+      color: var(--text-muted);
+      font: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 140ms ease;
+    }
+
+    .mode-btn.active {
+      background: var(--accent);
+      color: #ffffff;
+    }
+
+    .stage-card {
+      position: relative;
+      background: var(--card);
+      background-image: var(--stage-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 10px 10px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    .bubble {
+      position: relative;
+      max-width: 92%;
+      min-height: 30px;
+      padding: 7px 12px;
+      margin-bottom: 6px;
+      border-radius: 12px;
+      background: var(--bubble-bg);
+      border: 1.5px solid var(--bubble-border);
+      color: var(--bubble-text);
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.4;
+      text-align: center;
+      white-space: pre-line;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+      transition: opacity 180ms ease, transform 180ms ease;
+    }
+
+    .bubble.hidden {
+      opacity: 0;
+      transform: translateY(4px);
+      pointer-events: none;
+    }
+
+    .bubble::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      bottom: -6px;
+      width: 10px;
+      height: 10px;
+      background: var(--bubble-bg);
+      border-right: 1.5px solid var(--bubble-border);
+      border-bottom: 1.5px solid var(--bubble-border);
+      transform: translateX(-50%) rotate(45deg);
+    }
+
+    .canvas-wrap {
+      position: relative;
+      width: 100%;
+      height: 224px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: none;
+    }
+
+    #petCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: grab;
+    }
+
+    #petCanvas.dragging {
+      cursor: grabbing;
+    }
+
+    .status-pill {
+      margin-top: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 4px 12px;
+      border-radius: 999px;
+      background: var(--pill-bg);
+      color: var(--pill-text);
+      border: 1px solid rgba(129, 140, 248, 0.45);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #818cf8;
+      animation: pulse 1.8s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(0.85); }
+    }
+
+    .stage-hint {
+      margin-top: 5px;
+      font-size: 10.5px;
+      color: var(--text-muted);
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 9px 10px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+
+    .stat-tile {
+      background: var(--card-muted);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 6px 4px;
+      text-align: center;
+    }
+
+    .stat-num {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+      line-height: 1.2;
+    }
+
+    .stat-label {
+      margin-top: 2px;
+      font-size: 10.5px;
+      color: var(--text-muted);
+    }
+
+    .quick-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .btn-primary {
+      flex: 1;
+      appearance: none;
+      border: 0;
+      border-radius: 9px;
+      padding: 7px 10px;
+      background: linear-gradient(135deg, var(--accent), var(--pink));
+      color: #ffffff;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 100ms ease, opacity 120ms ease;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.93;
+    }
+
+    .btn-primary:active {
+      transform: scale(0.98);
+    }
+
+    .btn-secondary {
+      appearance: none;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 7px 10px;
+      background: var(--card-muted);
+      color: var(--text);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+
+    .actions-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .action-btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 6px;
+      background: var(--card-muted);
+      color: var(--text);
+      font: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 120ms ease;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .action-btn:hover {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .action-btn.active {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #ffffff;
+    }
+
+    .prefs-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .fps-control {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+      min-width: 150px;
+    }
+
+    .fps-control input[type="range"] {
+      flex: 1;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .toggle-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .toggle-pill input {
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    details.log-card summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+
+    details.log-card summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .log-list {
+      margin-top: 6px;
+      max-height: 150px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px;
+    }
+
+    .log-item {
+      padding: 4px 6px;
+      border-radius: 6px;
+      background: var(--card-muted);
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    .log-item .meta {
+      color: var(--accent);
+      margin-right: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <img src="./assets/logo.png" alt="哈Gemi" />
+        <div class="brand-meta">
+          <div class="brand-title">哈Gemi 桌面萌宠</div>
+          <div class="conn-line">
+            <span class="conn-dot" id="connDot"></span>
+            <span id="connText">正在连接 Antigravity…</span>
+          </div>
+        </div>
+      </div>
+      <div class="mode-switch" role="group" aria-label="渲染模式">
+        <button class="mode-btn active" id="modeDynamic" type="button">动态</button>
+        <button class="mode-btn" id="modeStatic" type="button">立绘</button>
+      </div>
+    </header>
+
+    <section class="stage-card">
+      <div class="bubble" id="speechBubble" title="点击换一句吐槽">哈Gemi 初始化中喵~</div>
+      <div class="canvas-wrap">
+        <canvas id="petCanvas"></canvas>
+      </div>
+      <div class="status-pill">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusBadge">Antigravity · 待命中</span>
+      </div>
+      <div class="stage-hint">单击戳一戳 · 按住拖拽悬空晃动 · 点击气泡换台词</div>
+    </section>
+
+    <section class="card">
+      <div class="stats-grid">
+        <div class="stat-tile">
+          <div class="stat-num" id="statThink">0</div>
+          <div class="stat-label">思考</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-num" id="statTool">0</div>
+          <div class="stat-label">工具</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-num" id="statDone">0</div>
+          <div class="stat-label">完工</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-num" id="statTokens">0</div>
+          <div class="stat-label">炫掉 Token</div>
+        </div>
+      </div>
+      <div class="quick-row">
+        <button class="btn-primary" id="btnFeed" type="button">🍚 投喂哈Gemi Token</button>
+        <button class="btn-secondary" id="btnPoke" type="button">✨ 戳一戳</button>
+      </div>
+      <div class="quick-row">
+        <button class="btn-secondary" id="btnDesktop" type="button" style="flex: 1;">🖥️ 弹出到桌面</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-title">
+        <span>🎭 动作与状态预览</span>
+        <span id="actionHint">6 套 120 帧序列</span>
+      </div>
+      <div class="actions-grid" id="actionsGrid"></div>
+      <div class="prefs-row">
+        <label class="fps-control">
+          <span>帧率 <strong id="fpsValue">14</strong></span>
+          <input type="range" id="fpsRange" min="8" max="24" step="1" value="14" />
+        </label>
+        <label class="toggle-pill">
+          <input type="checkbox" id="bubbleToggle" checked />
+          <span>气泡台词</span>
+        </label>
+        <label class="toggle-pill">
+          <input type="checkbox" id="desktopAutoToggle" checked />
+          <span>随插件自启桌面</span>
+        </label>
+        <button class="btn-secondary" id="btnReset" type="button" style="padding: 4px 8px; font-size: 11px;">清零</button>
+      </div>
+    </section>
+
+    <details class="card log-card">
+      <summary>
+        <span>📡 实时 Antigravity 状态事件流</span>
+        <span id="logCount">0 条</span>
+      </summary>
+      <div class="log-list" id="logList">
+        <div class="log-item">等待 Antigravity 思考、调工具、写代码或完工事件…</div>
+      </div>
+    </details>
+  </div>
+
+  <script>
+    (() => {
+      const searchParams = new URLSearchParams(location.search);
+      const sidecarToken = searchParams.get('token') || '';
+
+      function apiUrl(relPath) {
+        if (!sidecarToken) return relPath;
+        const sep = relPath.includes('?') ? '&' : '?';
+        return `${relPath}${sep}token=${encodeURIComponent(sidecarToken)}`;
+      }
+
+      function apiHeaders(isJson) {
+        const headers = {};
+        if (isJson) headers['Content-Type'] = 'application/json';
+        if (sidecarToken) headers['x-sidecar-token'] = sidecarToken;
+        return headers;
+      }
+
+      // Apply host theme changes if sidecar_sdk is active
+      function applyHostTheme(themeName) {
+        if (themeName === 'light' || themeName === 'dark') {
+          document.documentElement.dataset.theme = themeName;
+        }
+      }
+      if (window.sidecar) {
+        try {
+          if (typeof window.sidecar.getTheme === 'function') {
+            Promise.resolve(window.sidecar.getTheme()).then(applyHostTheme).catch(() => {});
+          }
+          if (typeof window.sidecar.onThemeChange === 'function') {
+            window.sidecar.onThemeChange(applyHostTheme);
+          }
+        } catch {}
+      }
+
+      const ACTION_LABELS = [
+        { key: 'idle', label: '😌 待机呼吸' },
+        { key: 'thinking', label: '💭 思考冒泡' },
+        { key: 'coding', label: '💻 疯狂写码' },
+        { key: 'happy', label: '✨ 开心跃动' },
+        { key: 'shocked', label: '⚡ 被吓一跳' },
+        { key: 'dangling', label: '🎀 悬空挣扎' }
+      ];
+
+      const STATE_COLORS = {
+        idle: '#818cf8',
+        thinking: '#38bdf8',
+        working: '#34d399',
+        celebrate: '#fbbf24',
+        petted: '#f472b6',
+        error: '#f87171',
+        dragged: '#c084fc'
+      };
+
+      const IDLE_QUOTES = [
+        '写代码的时候记得多喝水喵，颈椎也要照顾好~',
+        '本 Gemini 娘正盯着你的终端输出，有报错立刻提醒你！',
+        '咕噜…有点想吃高并发高质量的 Token 了喵~',
+        '右键或点我都能互动，拽起来还会悬空扑腾哦！',
+        '今天也要争取零 Bug 一次通过测试喵✨'
+      ];
+
+      const canvas = document.getElementById('petCanvas');
+      const ctx = canvas.getContext('2d');
+      const bubbleEl = document.getElementById('speechBubble');
+      const statusDotEl = document.getElementById('statusDot');
+      const statusBadgeEl = document.getElementById('statusBadge');
+      const connDotEl = document.getElementById('connDot');
+      const connTextEl = document.getElementById('connText');
+      const actionsGridEl = document.getElementById('actionsGrid');
+      const fpsRangeEl = document.getElementById('fpsRange');
+      const fpsValueEl = document.getElementById('fpsValue');
+      const bubbleToggleEl = document.getElementById('bubbleToggle');
+      const desktopAutoToggleEl = document.getElementById('desktopAutoToggle');
+      const btnDesktopEl = document.getElementById('btnDesktop');
+      const modeDynamicEl = document.getElementById('modeDynamic');
+      const modeStaticEl = document.getElementById('modeStatic');
+      const logListEl = document.getElementById('logList');
+      const logCountEl = document.getElementById('logCount');
+
+      let catalog = { dynamic: {}, avatars: {} };
+      const imageCache = new Map();
+
+      function loadImageCached(url) {
+        if (!url) return null;
+        if (imageCache.has(url)) return imageCache.get(url);
+        const entry = { img: new Image(), loaded: false, failed: false };
+        entry.img.decoding = 'async';
+        entry.img.onload = () => { entry.loaded = true; };
+        entry.img.onerror = () => { entry.failed = true; };
+        entry.img.src = url;
+        imageCache.set(url, entry);
+        return entry;
+      }
+
+      const sim = {
+        serverSeq: 0,
+        serverState: 'idle',
+        activeAction: 'idle',
+        loop: true,
+        frameIdx: 0,
+        frameAccum: 0,
+        fps: 14,
+        renderMode: 'dynamic',
+        showBubbles: true,
+        localBubbleText: '',
+        localBubbleUntil: 0,
+        serverBubbleText: '',
+        serverBubbleUntil: 0,
+        badge: 'Antigravity · 待命中',
+        isDragging: false,
+        dragStartX: 0,
+        dragStartY: 0,
+        dragMoved: false,
+        lastPointerX: 0,
+        velocityX: 0,
+        tiltDeg: 0,
+        scaleX: 1,
+        scaleY: 1,
+        velSx: 0,
+        velSy: 0,
+        t: 0,
+        particles: []
+      };
+
+      function fmtTokens(n) {
+        if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+        if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+        return String(n || 0);
+      }
+
+      function triggerSquish(strength = 0.16) {
+        sim.velSx += strength * 14;
+        sim.velSy -= strength * 14;
+      }
+
+      function spawnParticles(count = 7) {
+        const w = canvas.clientWidth || 300;
+        const h = canvas.clientHeight || 224;
+        const chars = ['♥', '✨', '🌸', '⭐', '✦'];
+        const colors = ['#ec4899', '#f472b6', '#fbbf24', '#818cf8', '#38bdf8'];
+        for (let i = 0; i < count; i++) {
+          sim.particles.push({
+            x: w * 0.5 + (Math.random() - 0.5) * 64,
+            y: h * 0.36 + (Math.random() - 0.5) * 24,
+            vx: (Math.random() - 0.5) * 70,
+            vy: -75 - Math.random() * 65,
+            alpha: 1,
+            size: 14 + Math.random() * 8,
+            char: chars[Math.floor(Math.random() * chars.length)],
+            color: colors[Math.floor(Math.random() * colors.length)]
+          });
+        }
+      }
+
+      function renderActionButtons() {
+        actionsGridEl.innerHTML = '';
+        for (const item of ACTION_LABELS) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'action-btn' + (sim.activeAction === item.key ? ' active' : '');
+          btn.textContent = item.label;
+          btn.dataset.actionKey = item.key;
+          btn.addEventListener('click', () => {
+            postAction({ type: 'preview', action: item.key });
+          });
+          actionsGridEl.appendChild(btn);
+        }
+      }
+
+      function syncActionButtonsActive() {
+        for (const btn of actionsGridEl.querySelectorAll('.action-btn')) {
+          btn.classList.toggle('active', btn.dataset.actionKey === sim.activeAction);
+        }
+      }
+
+      function applyServerState(snap) {
+        if (!snap) return;
+
+        if (snap.seq !== sim.serverSeq && !sim.isDragging) {
+          const prevAction = sim.activeAction;
+          sim.serverSeq = snap.seq;
+          sim.serverState = snap.state || 'idle';
+          sim.activeAction = snap.action || 'idle';
+          sim.loop = snap.loop !== false;
+          if (prevAction !== sim.activeAction || !sim.loop) {
+            sim.frameIdx = 0;
+            sim.frameAccum = 0;
+          }
+          if (sim.activeAction === 'happy') {
+            triggerSquish(0.18);
+            spawnParticles(7);
+          } else if (sim.activeAction === 'shocked') {
+            triggerSquish(0.2);
+          }
+          const actMeta = catalog.dynamic[sim.activeAction];
+          if (actMeta) loadImageCached(actMeta.spriteUrl);
+          const avMeta = catalog.avatars[sim.activeAction];
+          if (avMeta) loadImageCached(avMeta.url);
+        }
+
+        sim.badge = snap.badge || 'Antigravity · 待命中';
+        statusBadgeEl.textContent = sim.badge;
+        statusDotEl.style.background = STATE_COLORS[snap.state] || '#818cf8';
+
+        sim.serverBubbleText = snap.bubble || '';
+        sim.serverBubbleUntil = snap.bubbleUntil || 0;
+
+        if (snap.preferences) {
+          sim.fps = Number(snap.preferences.fps) || 14;
+          sim.renderMode = snap.preferences.renderMode === 'static' ? 'static' : 'dynamic';
+          sim.showBubbles = snap.preferences.showBubbles !== false;
+          fpsRangeEl.value = String(sim.fps);
+          fpsValueEl.textContent = String(sim.fps);
+          bubbleToggleEl.checked = sim.showBubbles;
+          modeDynamicEl.classList.toggle('active', sim.renderMode === 'dynamic');
+          modeStaticEl.classList.toggle('active', sim.renderMode === 'static');
+        }
+
+        if (snap.stats) {
+          document.getElementById('statThink').textContent = String(snap.stats.think || 0);
+          document.getElementById('statTool').textContent = String(snap.stats.tool || 0);
+          document.getElementById('statDone').textContent = String(snap.stats.done || 0);
+          document.getElementById('statTokens').textContent = fmtTokens(snap.stats.tokens || 0);
+        }
+
+        if (snap.watcher) {
+          const cnt = snap.watcher.trackedCount || 0;
+          const udpTag = snap.watcher.udpActive ? 'Hook+日志双引擎' : '实时日志监控';
+          connTextEl.textContent = `${udpTag} · ${cnt} 会话`;
+        }
+
+        if (Array.isArray(snap.recentEvents)) {
+          logCountEl.textContent = `${snap.recentEvents.length} 条`;
+          if (snap.recentEvents.length > 0) {
+            logListEl.innerHTML = '';
+            for (const ev of snap.recentEvents) {
+              const row = document.createElement('div');
+              row.className = 'log-item';
+              const d = new Date(ev.ts || Date.now());
+              const ts = d.toTimeString().slice(0, 8);
+              const metaSpan = document.createElement('span');
+              metaSpan.className = 'meta';
+              metaSpan.textContent = `[${ts} ${ev.source || '系统'}]`;
+              row.appendChild(metaSpan);
+              row.appendChild(document.createTextNode(ev.message || ''));
+              logListEl.appendChild(row);
+            }
+          }
+        }
+
+        if (snap.desktop) {
+          const d = snap.desktop;
+          if (!d.available) {
+            btnDesktopEl.textContent = '🖥️ 桌面悬浮窗不可用（需 PySide6）';
+            btnDesktopEl.disabled = true;
+          } else {
+            btnDesktopEl.disabled = false;
+            btnDesktopEl.textContent = d.running ? '🖥️ 桌面悬浮窗已开启（点击关闭）' : '🖥️ 弹出到桌面';
+          }
+          desktopAutoToggleEl.checked = d.autoStart !== false;
+        }
+
+        syncActionButtonsActive();
+      }
+
+      async function postDesktop(body) {
+        try {
+          const res = await fetch(apiUrl('./api/desktop'), {
+            method: 'POST',
+            headers: apiHeaders(true),
+            body: JSON.stringify(body)
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.state) applyServerState(data.state);
+          }
+        } catch {}
+      }
+
+      async function postAction(body) {
+        try {
+          const res = await fetch(apiUrl('./api/action'), {
+            method: 'POST',
+            headers: apiHeaders(true),
+            body: JSON.stringify(body)
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.state) applyServerState(data.state);
+          }
+        } catch {}
+      }
+
+      function updateBubbleDom() {
+        if (!sim.showBubbles) {
+          bubbleEl.classList.add('hidden');
+          return;
+        }
+        const now = Date.now();
+        let text = '';
+        if (sim.localBubbleText && now < sim.localBubbleUntil) {
+          text = sim.localBubbleText;
+        } else if (sim.serverBubbleText && now < sim.serverBubbleUntil) {
+          text = sim.serverBubbleText;
+        }
+        if (text) {
+          if (bubbleEl.textContent !== text) bubbleEl.textContent = text;
+          bubbleEl.classList.remove('hidden');
+        } else {
+          bubbleEl.classList.add('hidden');
+        }
+      }
+
+      function resizeCanvasIfNeeded() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+        const w = canvas.clientWidth;
+        const h = canvas.clientHeight;
+        if (!w || !h) return;
+        const targetW = Math.round(w * dpr);
+        const targetH = Math.round(h * dpr);
+        if (canvas.width !== targetW || canvas.height !== targetH) {
+          canvas.width = targetW;
+          canvas.height = targetH;
+        }
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      let lastTs = performance.now();
+      function frameLoop(now) {
+        const dt = Math.min(0.05, Math.max(0.001, (now - lastTs) / 1000));
+        lastTs = now;
+        sim.t += dt;
+
+        const actionKey = sim.isDragging ? 'dangling' : sim.activeAction;
+        const act = catalog.dynamic[actionKey] || catalog.dynamic.idle;
+
+        if (sim.renderMode === 'dynamic' && act) {
+          const frameDur = 1 / Math.max(6, sim.fps);
+          sim.frameAccum += dt;
+          while (sim.frameAccum >= frameDur) {
+            sim.frameAccum -= frameDur;
+            sim.frameIdx += 1;
+            if (sim.frameIdx >= act.frameCount) {
+              if (sim.loop || sim.isDragging) {
+                sim.frameIdx = 0;
+              } else {
+                sim.activeAction = 'idle';
+                sim.loop = true;
+                sim.frameIdx = 0;
+                syncActionButtonsActive();
+              }
+            }
+          }
+        }
+
+        // Spring squish physics
+        const stiffness = 185;
+        const damping = 12.5;
+        const ax = (1 - sim.scaleX) * stiffness - sim.velSx * damping;
+        const ay = (1 - sim.scaleY) * stiffness - sim.velSy * damping;
+        sim.velSx += ax * dt;
+        sim.velSy += ay * dt;
+        sim.scaleX = Math.max(0.76, Math.min(1.26, sim.scaleX + sim.velSx * dt));
+        sim.scaleY = Math.max(0.76, Math.min(1.26, sim.scaleY + sim.velSy * dt));
+
+        // Breathing + drag swing tilt
+        let breathX = 1;
+        let breathY = 1;
+        let targetTilt = 0;
+        if (sim.isDragging) {
+          breathY = 1.05;
+          breathX = 0.95;
+          targetTilt = Math.max(-22, Math.min(22, -sim.velocityX * 0.75));
+          sim.velocityX *= 0.85;
+        } else {
+          const breath = Math.sin(sim.t * 3.2) * 0.016;
+          breathY = 1 + breath;
+          breathX = 1 - breath * 0.6;
+          targetTilt = Math.sin(sim.t * 1.6) * 1.1;
+        }
+        sim.tiltDeg += (targetTilt - sim.tiltDeg) * Math.min(1, dt * 12);
+
+        // Update particles
+        for (let i = sim.particles.length - 1; i >= 0; i--) {
+          const p = sim.particles[i];
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.alpha -= dt * 1.3;
+          if (p.alpha <= 0) sim.particles.splice(i, 1);
+        }
+
+        // Draw
+        resizeCanvasIfNeeded();
+        const cw = canvas.clientWidth;
+        const ch = canvas.clientHeight;
+        ctx.clearRect(0, 0, cw, ch);
+
+        let drawn = false;
+        if (sim.renderMode === 'dynamic' && act) {
+          const entry = loadImageCached(act.spriteUrl);
+          if (entry && entry.loaded && !entry.failed) {
+            const idx = sim.frameIdx % act.frameCount;
+            const col = idx % act.columns;
+            const row = Math.floor(idx / act.columns);
+            // Center-crop the 640x360 sprite frame to trim excess transparent side margin
+            const cropX = act.frameWidth >= 530 ? 110 : 0;
+            const cropW = act.frameWidth >= 530 ? 420 : act.frameWidth;
+            const sx = col * act.frameWidth + cropX;
+            const sy = row * act.frameHeight;
+            const sw = cropW;
+            const sh = act.frameHeight;
+
+            const maxH = ch * 0.96;
+            const maxW = cw * 0.94;
+            const scale = Math.min(maxW / sw, maxH / sh);
+            const dw = sw * scale;
+            const dh = sh * scale;
+
+            ctx.save();
+            ctx.translate(cw * 0.5, ch * 0.92);
+            ctx.rotate((sim.tiltDeg * Math.PI) / 180);
+            ctx.scale(sim.scaleX * breathX, sim.scaleY * breathY);
+            ctx.drawImage(entry.img, sx, sy, sw, sh, -dw * 0.5, -dh, dw, dh);
+            ctx.restore();
+            drawn = true;
+          }
+        }
+
+        if (!drawn) {
+          const av = catalog.avatars[actionKey] || catalog.avatars.idle;
+          if (av) {
+            const entry = loadImageCached(av.url);
+            if (entry && entry.loaded && !entry.failed) {
+              const iw = entry.img.naturalWidth || 400;
+              const ih = entry.img.naturalHeight || 500;
+              const scale = Math.min((cw * 0.85) / iw, (ch * 0.94) / ih);
+              const dw = iw * scale;
+              const dh = ih * scale;
+              ctx.save();
+              ctx.translate(cw * 0.5, ch * 0.94);
+              ctx.rotate((sim.tiltDeg * Math.PI) / 180);
+              ctx.scale(sim.scaleX * breathX, sim.scaleY * breathY);
+              ctx.drawImage(entry.img, -dw * 0.5, -dh, dw, dh);
+              ctx.restore();
+              drawn = true;
+            }
+          }
+        }
+
+        if (!drawn) {
+          ctx.save();
+          ctx.fillStyle = '#94a3b8';
+          ctx.font = '600 12px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('正在加载哈Gemi 动态素材…', cw * 0.5, ch * 0.5);
+          ctx.restore();
+        }
+
+        for (const p of sim.particles) {
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, Math.min(1, p.alpha));
+          ctx.fillStyle = p.color;
+          ctx.font = `${Math.round(p.size)}px "Segoe UI Emoji", sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.fillText(p.char, p.x, p.y);
+          ctx.restore();
+        }
+
+        updateBubbleDom();
+        requestAnimationFrame(frameLoop);
+      }
+
+      // Pointer drag & click interactions on canvas
+      canvas.addEventListener('pointerdown', (e) => {
+        canvas.setPointerCapture(e.pointerId);
+        sim.isDragging = true;
+        sim.dragMoved = false;
+        sim.dragStartX = e.clientX;
+        sim.dragStartY = e.clientY;
+        sim.lastPointerX = e.clientX;
+        sim.velocityX = 0;
+      });
+
+      canvas.addEventListener('pointermove', (e) => {
+        if (!sim.isDragging) return;
+        const dx = e.clientX - sim.dragStartX;
+        const dy = e.clientY - sim.dragStartY;
+        if (!sim.dragMoved && Math.hypot(dx, dy) > 6) {
+          sim.dragMoved = true;
+          canvas.classList.add('dragging');
+          sim.frameIdx = 0;
+          sim.localBubbleText = '呜哇哇！快把哈Gemi 放下来喵~';
+          sim.localBubbleUntil = Date.now() + 2600;
+          if (catalog.dynamic.dangling) loadImageCached(catalog.dynamic.dangling.spriteUrl);
+        }
+        sim.velocityX = e.clientX - sim.lastPointerX;
+        sim.lastPointerX = e.clientX;
+      });
+
+      function endDrag() {
+        if (!sim.isDragging) return;
+        const wasMoved = sim.dragMoved;
+        sim.isDragging = false;
+        sim.dragMoved = false;
+        sim.velocityX = 0;
+        canvas.classList.remove('dragging');
+        if (wasMoved) {
+          triggerSquish(0.22);
+          sim.localBubbleText = '呼…安全着陆啦喵！';
+          sim.localBubbleUntil = Date.now() + 2200;
+        } else {
+          triggerSquish(0.18);
+          spawnParticles(7);
+          postAction({ type: 'poke' });
+        }
+      }
+
+      canvas.addEventListener('pointerup', endDrag);
+      canvas.addEventListener('pointercancel', endDrag);
+
+      bubbleEl.addEventListener('click', () => {
+        const line = IDLE_QUOTES[Math.floor(Math.random() * IDLE_QUOTES.length)];
+        sim.localBubbleText = line;
+        sim.localBubbleUntil = Date.now() + 4500;
+        triggerSquish(0.12);
+      });
+
+      document.getElementById('btnFeed').addEventListener('click', () => {
+        spawnParticles(10);
+        triggerSquish(0.2);
+        postAction({ type: 'feed' });
+      });
+
+      document.getElementById('btnPoke').addEventListener('click', () => {
+        spawnParticles(7);
+        triggerSquish(0.18);
+        postAction({ type: 'poke' });
+      });
+
+      document.getElementById('btnReset').addEventListener('click', () => {
+        postAction({ type: 'reset_stats' });
+      });
+
+      btnDesktopEl.addEventListener('click', () => {
+        postDesktop({ action: 'toggle' });
+      });
+
+      desktopAutoToggleEl.addEventListener('change', () => {
+        postDesktop({ action: 'set_auto_start', autoStart: desktopAutoToggleEl.checked });
+      });
+
+      fpsRangeEl.addEventListener('input', () => {
+        sim.fps = Number(fpsRangeEl.value) || 14;
+        fpsValueEl.textContent = String(sim.fps);
+      });
+
+      fpsRangeEl.addEventListener('change', () => {
+        postAction({ type: 'preferences', fps: Number(fpsRangeEl.value) || 14 });
+      });
+
+      bubbleToggleEl.addEventListener('change', () => {
+        sim.showBubbles = bubbleToggleEl.checked;
+        postAction({ type: 'preferences', showBubbles: sim.showBubbles });
+      });
+
+      modeDynamicEl.addEventListener('click', () => {
+        sim.renderMode = 'dynamic';
+        modeDynamicEl.classList.add('active');
+        modeStaticEl.classList.remove('active');
+        postAction({ type: 'preferences', renderMode: 'dynamic' });
+      });
+
+      modeStaticEl.addEventListener('click', () => {
+        sim.renderMode = 'static';
+        modeStaticEl.classList.add('active');
+        modeDynamicEl.classList.remove('active');
+        postAction({ type: 'preferences', renderMode: 'static' });
+      });
+
+      function connectSse() {
+        const es = new EventSource(apiUrl('./api/events'));
+        es.onopen = () => {
+          connDotEl.classList.add('online');
+        };
+        es.addEventListener('state', (evt) => {
+          connDotEl.classList.add('online');
+          try {
+            const msg = JSON.parse(evt.data);
+            if (msg && msg.data) applyServerState(msg.data);
+          } catch {}
+        });
+        es.onerror = () => {
+          connDotEl.classList.remove('online');
+        };
+      }
+
+      async function boot() {
+        renderActionButtons();
+        try {
+          const [actionsRes, stateRes] = await Promise.all([
+            fetch(apiUrl('./api/actions')),
+            fetch(apiUrl('./api/state'))
+          ]);
+          if (actionsRes.ok) {
+            catalog = await actionsRes.json();
+            if (catalog.dynamic.idle) loadImageCached(catalog.dynamic.idle.spriteUrl);
+            if (catalog.avatars.idle) loadImageCached(catalog.avatars.idle.url);
+          }
+          if (stateRes.ok) {
+            applyServerState(await stateRes.json());
+          }
+        } catch {}
+
+        connectSse();
+        requestAnimationFrame(frameLoop);
+      }
+
+      boot();
+    })();
+  </script>
+</body>
+</html>

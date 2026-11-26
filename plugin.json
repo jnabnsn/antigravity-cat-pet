@@ -1,0 +1,13 @@
+{
+  "name": "antigravity-hagemi-pet",
+  "displayName": "哈Gemi 桌面萌宠",
+  "description": "元气毒舌 Gemini 娘（哈Gemi）Antigravity 原生插件：在右侧辅助面板以 60 FPS 播放 120 帧透明 WebP 动态动作，实时同步思考、写代码、报错与完工状态并统计 Token 消耗。",
+  "version": "2.0.0",
+  "author": "antigravity-hagemi-pet contributors",
+  "logo": "assets/logo.png",
+  "suggestedPrompts": [
+    "打开哈Gemi 桌面萌宠右侧面板看看她现在的状态",
+    "测试让哈Gemi 切换不同动作或检查插件监听状态",
+    "如何自定义哈Gemi 的帧率、气泡台词或重置统计"
+  ]
+}

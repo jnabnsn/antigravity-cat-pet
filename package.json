@@ -1,0 +1,17 @@
+{
+  "name": "antigravity-hagemi-pet",
+  "version": "2.0.0",
+  "description": "哈Gemi（Gemini 娘）Antigravity 原生插件 — 右侧辅助面板 120 帧动态萌宠与实时工作流联动",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node sidecar/server.mjs",
+    "install:plugin": "node scripts/install_plugin.mjs",
+    "uninstall:plugin": "node scripts/install_plugin.mjs --uninstall",
+    "verify": "node scripts/verify_plugin.mjs"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "MIT"
+}

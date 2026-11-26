@@ -1,32 +1,9 @@
 # Third-Party Notices
 
-This project uses open-source animation assets, font, icon, and sound effects
-originally created and published by the **dsh-pet** community project:
+1. **哈Gemi（DesktopGeminiGirl）立绘与动态素材**
+   - Source: `DesktopGeminiGirl/assets`
+   - 动态 120 帧 WebP 动作序列（`待机呼吸休闲`、`工作状态-思考冒泡`、`写代码`、`点击回应-开心跃动`、`被吓一跳`、`被鼠标拖拽悬空反馈`）源自开源项目 [hunmer/aboutme-pets](https://github.com/hunmer/aboutme-pets)（非商用，需保留署名，详见各 `.json` 元数据中的 `License` 字段）。
+   - Gemini 娘静态表情差分源自 B 站 UP 主 **@Xx勿忘xX**，原版 Gemini 娘人设与主立绘原创作者为 **@zipzip**。
 
-- **Project**: [PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet)
-- **License**: MIT License
-- **Copyright**: Copyright (c) 2026 PC2005-cloud
-
-```text
-MIT License
-
-Copyright (c) 2026 PC2005-cloud
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
+2. **原仓库架构致谢**
+   - 本项目最初基于 `antigravity-whale-pet`（MIT License）演进为纯 Node.js 原生 Antigravity Sidecar 插件。

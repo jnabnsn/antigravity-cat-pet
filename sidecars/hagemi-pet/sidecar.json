@@ -1,0 +1,23 @@
+{
+  "command": "node",
+  "args": [
+    "../../sidecar/server.mjs"
+  ],
+  "env": {
+    "HAGEMI_PET_SIDECAR": "1"
+  },
+  "restart_policy": "always",
+  "display_name": "哈Gemi 桌面萌宠",
+  "description": "在 Antigravity 右侧辅助面板展示动态哈Gemi（Gemini 娘）萌宠，实时联动思考、写代码、调用工具、报错与完工状态。",
+  "has_web_ui": true,
+  "ui_config": {
+    "display_name": "哈Gemi 桌面萌宠",
+    "views": [
+      {
+        "title": "哈Gemi 桌面萌宠",
+        "path": "/",
+        "entrypoint": "SIDECAR_UI_ENTRYPOINT_AUX_PANE"
+      }
+    ]
+  }
+}
